@@ -1,4 +1,4 @@
-name: Build Mi App APK
+name: Build Mi APK
 
 on:
   push:
