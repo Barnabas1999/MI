@@ -9,19 +9,34 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           sudo apt update
-          sudo apt install -y openjdk-17-jdk zip unzip python3-pip libltdl-dev
-          pip install --upgrade pip
+          sudo apt install -y openjdk-17-jdk zip unzip python3-pip
           pip install buildozer cython==0.29.33
 
-      - name: Build with auto license accept
+      - name: Force Accept Android Licenses (Fix Aidl)
         run: |
           rm -rf ~/.buildozer
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
+          mkdir -p $ANDROID_HOME/licenses
+          # This is the magic license that unlocks Build-Tools 37
+          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $ANDROID_HOME/licenses/android-sdk-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_HOME/licenses/android-sdk-license
+          echo "24333f8a63b6825ea9c5514f83c1051866b74d9b" >> $ANDROID_HOME/licenses/android-sdk-license
           yes | sdkmanager --licenses || true
+          sdkmanager "build-tools;33.0.2" "build-tools;37.0.0" "platforms;android-33" || true
+
+      - name: Build APK
+        run: |
+          # Copy licenses into buildozer's folder too
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          cp $ANDROID_HOME/licenses/* ~/.buildozer/android/platform/android-sdk/licenses/ || true
+          buildozer android debug
+          # If first time failed to create folder, try again after it creates folder
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          cp $ANDROID_HOME/licenses/* ~/.buildozer/android/platform/android-sdk/licenses/ || true
           buildozer android debug
 
       - name: Upload APK
