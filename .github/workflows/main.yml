@@ -8,47 +8,42 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
       - name: Install deps
         run: |
           sudo apt update
           sudo apt install -y openjdk-17-jdk zip unzip python3-pip
           pip install buildozer cython==0.29.33
-
-      - name: Build APK - auto find sdkmanager
+      - name: Build with full log capture
         run: |
-          rm -rf ~/.buildozer bin
+          rm -rf ~/.buildozer
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
-
-          # 1st run to create SDK folder (will fail on aidl)
-          buildozer android debug || true
-
-          # Find where buildozer hid sdkmanager
           SDK="$HOME/.buildozer/android/platform/android-sdk"
-          echo "SDK root: $SDK"
-          find $HOME/.buildozer -type d | head -n 20
+          buildozer android debug || true
           SDKMGR=$(find $SDK -name sdkmanager -type f 2>/dev/null | head -n 1)
-          echo "Found sdkmanager at: $SDKMGR"
-          if [ -z "$SDKMGR" ]; then SDKMGR=$(which sdkmanager); echo "Using host sdkmanager: $SDKMGR"; fi
-
-          # Install licenses and build-tools into buildozer's SDK
+          if [ -z "$SDKMGR" ]; then SDKMGR=$(which sdkmanager); fi
           mkdir -p $SDK/licenses
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $SDK/licenses/android-sdk-license
           echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $SDK/licenses/android-sdk-license
           echo "24333f8a63b6825ea9c5514f83c1051866b74d9b" >> $SDK/licenses/android-sdk-license
           echo "601085b94cd77f0b54ff86406957099faeb8b504" > $SDK/licenses/android-sdk-preview-license
+          yes | $SDKMGR --sdk_root=$SDK --licenses > /dev/null 2>&1 || true
+          $SDKMGR --sdk_root=$SDK "build-tools;33.0.2" "build-tools;37.0.0" > /dev/null 2>&1 || true
 
-          yes | $SDKMGR --sdk_root=$SDK --licenses || true
-          $SDKMGR --sdk_root=$SDK "build-tools;33.0.2" "build-tools;37.0.0" || true
+          echo "=== STARTING REAL BUILD ==="
+          buildozer --log-level 2 android debug 2>&1 | tee build.log
+          echo "=== BUILD FINISHED, searching for error ==="
+          grep -A5 -B5 "\[ERROR\]\|FAILED\|Exception\|Error:" build.log | tail -n 100
 
-          ls $SDK/build-tools/ || true
-          ls $SDK/build-tools/37.0.0/ || true
+      - name: Upload full log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-build-log
+          path: build.log
 
-          # 2nd run - real build
-          buildozer android debug
-
-      - name: Upload APK
+      - name: Upload APK if exists
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mi-apk
