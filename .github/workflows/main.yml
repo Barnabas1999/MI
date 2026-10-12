@@ -9,28 +9,35 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install system deps
         run: |
           sudo apt update
-          sudo apt install -y python3-pip openjdk-17-jdk zip unzip libltdl-dev libffi-dev libssl-dev
-          pip install --upgrade pip
+          sudo apt install -y openjdk-17-jdk zip unzip python3-pip
           pip install buildozer cython==0.29.33
 
-      - name: Clean old build
-        run: rm -rf ~/.buildozer
-
-      - name: Build APK (with license fix)
+      - name: Fix AIDL - Install Build Tools 33 and 37
         run: |
+          rm -rf ~/.buildozer
           mkdir -p ~/.android
-          touch ~/.android/repositories.cfg
+          echo "count=0" > ~/.android/repositories.cfg
+          # Accept all licenses on main SDK
           yes | sdkmanager --licenses || true
-          # First run to download SDK
+          sdkmanager --install "build-tools;33.0.2" "build-tools;37.0.0" "platforms;android-33" "platform-tools" || true
+
+          # First buildozer run to create its own SDK
           buildozer android debug || true
-          # Accept license inside buildozer's own SDK
+
+          # NOW accept license inside buildozer's OWN SDK - THIS IS THE KEY FOR AIDL
+          echo "Accepting license inside buildozer SDK..."
           yes | ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager "build-tools;33.0.2" "platforms;android-33" || true
-          # Second real build
-          buildozer android debug
+          ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --install "build-tools;33.0.2" "build-tools;37.0.0" "platforms;android-33" || true
+
+          ls ~/.buildozer/android/platform/android-sdk/build-tools/ -lh
+          echo "AIDL path:"
+          find ~/.buildozer -name aidl -type f
+
+      - name: Second Build - Real APK
+        run: buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
