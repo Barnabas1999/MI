@@ -8,25 +8,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
       - name: Install deps
         run: |
           sudo apt update
           sudo apt install -y openjdk-17-jdk zip unzip python3-pip
           pip install buildozer cython==0.29.33
-      - name: Pre-fix licenses and sdkmanager
+
+      - name: Pre-create licenses and fix sdkmanager path
         run: |
           rm -rf ~/.buildozer
-          mkdir -p ~/.android $ANDROID_HOME/licenses ~/.buildozer/android/platform/android-sdk/licenses
+          # 1. Create licenses EVERYWHERE
+          mkdir -p ~/.android
+          mkdir -p $ANDROID_HOME/licenses
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
           touch ~/.android/repositories.cfg
-          echo -e "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c1051866b74d9b" > $ANDROID_HOME/licenses/android-sdk-license
-          cp $ANDROID_HOME/licenses/android-sdk-license ~/.buildozer/android/platform/android-sdk/licenses/
+          LICENSE="8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c1051866b74d9b"
+          echo -e $LICENSE > $ANDROID_HOME/licenses/android-sdk-license
+          echo -e $LICENSE > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo -e $LICENSE > ~/.android/licenses/android-sdk-license 2>/dev/null || mkdir -p ~/.android/licenses && echo -e $LICENSE > ~/.android/licenses/android-sdk-license
+          cat $ANDROID_HOME/licenses/android-sdk-license
+
+          # 2. Accept on host
           yes | sdkmanager --licenses || true
-          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/
+          sdkmanager "build-tools;33.0.2" "build-tools;37.0.0" || true
+
+          # 3. Pre-create buildozer SDK structure so it never says "sdkmanager does not exist"
+          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin
           cp -r $ANDROID_HOME/cmdline-tools/latest/* ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/ || true
           mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
           ln -sf ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager || true
+
       - name: Build APK
-        run: buildozer android debug
+        run: |
+          buildozer android debug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
