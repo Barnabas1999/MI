@@ -1,22 +1,23 @@
 [app]
-title = Mi
-package.name = mi
-package.domain = com.mi.connect
+title = Mi App
+package.name = miapp
+package.domain = com.barnabas.miapp
 source.dir =.
-source.include_exts = py,png,jpg,kv,json
-version = 3.0
-requirements = python3,kivy==2.3.0,kivymd==1.1.1,requests,pillow,urllib3,plyer,jnius
+source.include_exts = py,png,jpg,kv,atlas,json
+version = 0.1
+requirements = python3,kivy
 orientation = portrait
 fullscreen = 0
-icon.filename = %(source.dir)s/icon.png
-[buildozer]
-log_level = 2
-[app:android]
-permissions = INTERNET,CAMERA,RECORD_AUDIO,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,POST_NOTIFICATION,VIBRATE
+
+android.permissions = INTERNET
 android.api = 33
 android.minapi = 21
 android.ndk = 25b
-android.accept_sdk_license_agreement = True
 android.sdk = 33
 android.build_tools_version = 33.0.2
-p4a.bootstrap = sdl2
+android.accept_sdk_license_agreement = True
+android.ant = auto
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
