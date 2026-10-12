@@ -15,32 +15,37 @@ jobs:
           sudo apt install -y openjdk-17-jdk zip unzip python3-pip
           pip install buildozer cython==0.29.33
 
-      - name: Build APK - 2 step fix for Aidl
+      - name: Build APK - auto find sdkmanager
         run: |
           rm -rf ~/.buildozer bin
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
 
-          # Step 1: Let buildozer create its SDK (it will fail on Aidl but that's ok)
+          # 1st run to create SDK folder (will fail on aidl)
           buildozer android debug || true
 
-          # Step 2: NOW install Aidl directly into buildozer's SDK
+          # Find where buildozer hid sdkmanager
           SDK="$HOME/.buildozer/android/platform/android-sdk"
-          CMDLINE="$SDK/cmdline-tools/latest/bin"
+          echo "SDK root: $SDK"
+          find $HOME/.buildozer -type d | head -n 20
+          SDKMGR=$(find $SDK -name sdkmanager -type f 2>/dev/null | head -n 1)
+          echo "Found sdkmanager at: $SDKMGR"
+          if [ -z "$SDKMGR" ]; then SDKMGR=$(which sdkmanager); echo "Using host sdkmanager: $SDKMGR"; fi
 
+          # Install licenses and build-tools into buildozer's SDK
           mkdir -p $SDK/licenses
           echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $SDK/licenses/android-sdk-license
           echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $SDK/licenses/android-sdk-license
           echo "24333f8a63b6825ea9c5514f83c1051866b74d9b" >> $SDK/licenses/android-sdk-license
           echo "601085b94cd77f0b54ff86406957099faeb8b504" > $SDK/licenses/android-sdk-preview-license
 
-          yes | $CMDLINE/sdkmanager --sdk_root=$SDK --licenses || true
-          $CMDLINE/sdkmanager --sdk_root=$SDK "build-tools;33.0.2" "build-tools;37.0.0" "platforms;android-33" "platforms;android-34" || true
+          yes | $SDKMGR --sdk_root=$SDK --licenses || true
+          $SDKMGR --sdk_root=$SDK "build-tools;33.0.2" "build-tools;37.0.0" || true
 
-          ls $SDK/build-tools/ -lh
-          ls $SDK/build-tools/37.0.0/ -lh | grep aidl
+          ls $SDK/build-tools/ || true
+          ls $SDK/build-tools/37.0.0/ || true
 
-          # Step 3: Real build - now Aidl exists
+          # 2nd run - real build
           buildozer android debug
 
       - name: Upload APK
