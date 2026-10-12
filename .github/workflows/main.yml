@@ -13,7 +13,7 @@ jobs:
           sudo apt update
           sudo apt install -y openjdk-17-jdk zip unzip python3-pip
           pip install buildozer cython==0.29.33
-      - name: Build with full log capture
+      - name: Build APK
         run: |
           rm -rf ~/.buildozer
           mkdir -p ~/.android
@@ -23,26 +23,26 @@ jobs:
           SDKMGR=$(find $SDK -name sdkmanager -type f 2>/dev/null | head -n 1)
           if [ -z "$SDKMGR" ]; then SDKMGR=$(which sdkmanager); fi
           mkdir -p $SDK/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $SDK/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $SDK/licenses/android-sdk-license
-          echo "24333f8a63b6825ea9c5514f83c1051866b74d9b" >> $SDK/licenses/android-sdk-license
+          echo -e "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c1051866b74d9b" > $SDK/licenses/android-sdk-license
           echo "601085b94cd77f0b54ff86406957099faeb8b504" > $SDK/licenses/android-sdk-preview-license
-          yes | $SDKMGR --sdk_root=$SDK --licenses > /dev/null 2>&1 || true
-          $SDKMGR --sdk_root=$SDK "build-tools;33.0.2" "build-tools;37.0.0" > /dev/null 2>&1 || true
-
-          echo "=== STARTING REAL BUILD ==="
-          buildozer --log-level 2 android debug 2>&1 | tee build.log
-          echo "=== BUILD FINISHED, searching for error ==="
-          grep -A5 -B5 "\[ERROR\]\|FAILED\|Exception\|Error:" build.log | tail -n 100
+          yes | $SDKMGR --sdk_root=$SDK --licenses || true
+          $SDKMGR --sdk_root=$SDK "build-tools;33.0.2" "build-tools;37.0.0" || true
+          # Real build - save ALL output
+          set -o pipefail
+          buildozer --log-level 2 android debug > $GITHUB_WORKSPACE/full_log.txt 2>&1 || true
+          echo "--- LAST 200 LINES ---"
+          tail -n 200 $GITHUB_WORKSPACE/full_log.txt
+          echo "--- ERRORS ---"
+          grep -i "error\|exception\|failed" $GITHUB_WORKSPACE/full_log.txt | tail -n 100 || true
 
       - name: Upload full log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: full-build-log
-          path: build.log
+          path: full_log.txt
 
-      - name: Upload APK if exists
+      - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
