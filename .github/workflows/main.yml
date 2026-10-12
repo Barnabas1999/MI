@@ -8,38 +8,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install system deps
+      - name: Install deps
         run: |
           sudo apt update
-          sudo apt install -y openjdk-17-jdk zip unzip python3-pip libffi-dev
-          pip install --upgrade pip
+          sudo apt install -y openjdk-17-jdk zip unzip python3-pip
           pip install buildozer cython==0.29.33
-
-      - name: Build APK
+      - name: Pre-fix licenses and sdkmanager
         run: |
           rm -rf ~/.buildozer
-          mkdir -p ~/.android
+          mkdir -p ~/.android $ANDROID_HOME/licenses ~/.buildozer/android/platform/android-sdk/licenses
           touch ~/.android/repositories.cfg
-          # Accept licenses on host SDK
-          mkdir -p $ANDROID_HOME/licenses
-          echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $ANDROID_HOME/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_HOME/licenses/android-sdk-license
-          echo "24333f8a63b6825ea9c5514f83c1051866b74d9b" >> $ANDROID_HOME/licenses/android-sdk-license
+          echo -e "8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c1051866b74d9b" > $ANDROID_HOME/licenses/android-sdk-license
+          cp $ANDROID_HOME/licenses/android-sdk-license ~/.buildozer/android/platform/android-sdk/licenses/
           yes | sdkmanager --licenses || true
-
-          # First build - will download NDK 28c and SDK
-          buildozer android debug || true
-
-          # FIX the missing sdkmanager path error from your screenshot
+          mkdir -p ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/
+          cp -r $ANDROID_HOME/cmdline-tools/latest/* ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/ || true
           mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-          cp -r $ANDROID_HOME/cmdline-tools ~/.buildozer/android/platform/android-sdk/ || true
-          ln -sf $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager || true
-          cp $ANDROID_HOME/licenses/* ~/.buildozer/android/platform/android-sdk/licenses/ || true
-
-          # Second build - real one that will succeed
-          buildozer android debug
-
+          ln -sf ~/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager || true
+      - name: Build APK
+        run: buildozer android debug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
